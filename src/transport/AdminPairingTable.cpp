@@ -214,7 +214,7 @@ CHIP_ERROR AdminPairingInfo::SetRootCert(const ByteSpan & cert)
     }
 
     VerifyOrReturnError(cert.size() <= kMaxCHIPCertLength, CHIP_ERROR_INVALID_ARGUMENT);
-    if (mRootCertLen != 0 && mRootCertAllocatedLen < cert.size())
+    if (mRootCertAllocatedLen < cert.size())
     {
         ReleaseRootCert();
     }
@@ -253,7 +253,7 @@ CHIP_ERROR AdminPairingInfo::SetOperationalCert(const ByteSpan & cert)
 
     // There could be two certs in the set -> ICA and NOC
     VerifyOrReturnError(cert.size() <= kMaxCHIPCertLength * 2, CHIP_ERROR_INVALID_ARGUMENT);
-    if (mOpCertLen != 0 && mOpCertAllocatedLen < cert.size())
+    if (mOpCertAllocatedLen < cert.size())
     {
         ReleaseOperationalCert();
     }
@@ -275,6 +275,7 @@ CHIP_ERROR AdminPairingInfo::GetCredentials(OperationalCredentialSet & credentia
                                             CertificateKeyId & rootKeyId)
 {
     constexpr uint8_t kMaxNumCertsInOpCreds = 3;
+    certificates.Release();
     ReturnErrorOnFailure(certificates.Init(kMaxNumCertsInOpCreds, kMaxCHIPCertLength * kMaxNumCertsInOpCreds));
 
     ReturnErrorOnFailure(

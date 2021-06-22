@@ -754,10 +754,14 @@ CHIP_ERROR ConvertX509CertsToChipCertArray(const ByteSpan & x509NOC, const ByteS
     {
         VerifyOrReturnError(CanCastTo<uint32_t>(x509ICAC.size()), CHIP_ERROR_INVALID_ARGUMENT);
         reader.Init(x509ICAC.data(), static_cast<uint32_t>(x509ICAC.size()));
-        uint64_t icaIssuer, icaSubject, icaFabric;
+        uint64_t icaIssuer, icaSubject, icaFabric = 0;
         ReturnErrorOnFailure(ConvertCertificate(reader, writer, AnonymousTag, icaIssuer, icaSubject, icaFabric));
         VerifyOrReturnError(icaSubject == nocIssuer, CHIP_ERROR_INVALID_ARGUMENT);
-        VerifyOrReturnError(icaFabric == nocFabric, CHIP_ERROR_INVALID_ARGUMENT);
+        if (icaFabric != 0)
+        {
+            // Match ICA's fabric ID if the ICA certificate has provided it
+            VerifyOrReturnError(icaFabric == nocFabric, CHIP_ERROR_INVALID_ARGUMENT);
+        }
     }
 
     ReturnErrorOnFailure(writer.EndContainer(outerContainer));

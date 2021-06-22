@@ -143,7 +143,8 @@ public:
 
         if (mOperationalKey != nullptr)
         {
-            mOperationalKey->Initialize();
+            chip::Platform::Delete(mOperationalKey);
+            mOperationalKey = nullptr;
         }
         ReleaseRootCert();
         ReleaseOperationalCert();
