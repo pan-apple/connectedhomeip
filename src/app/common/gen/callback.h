@@ -15891,17 +15891,17 @@ bool emberAfOperationalCredentialsClusterOpCSRResponseCallback(chip::app::Comman
                                                                chip::ByteSpan Signature);
 
 /**
- * @brief  Cluster AddOpCert Command callback
+ * @brief  Cluster AddNOC Command callback
  */
-bool emberAfOperationalCredentialsClusterAddOpCertCallback(chip::app::Command * commandObj, chip::ByteSpan NOCArray,
-                                                           chip::ByteSpan IPKValue, chip::NodeId CaseAdminNode,
-                                                           uint16_t AdminVendorId);
+bool emberAfOperationalCredentialsClusterAddNOCCallback(chip::app::Command * commandObj, chip::ByteSpan NOCArray,
+                                                        chip::ByteSpan IPKValue, chip::NodeId CaseAdminNode,
+                                                        uint16_t AdminVendorId);
 
 /**
- * @brief  Cluster OpCertResponse Command callback
+ * @brief  Cluster NOCResponse Command callback
  */
-bool emberAfOperationalCredentialsClusterOpCertResponseCallback(chip::app::Command * commandObj, uint8_t StatusCode,
-                                                                uint64_t FabricIndex, uint8_t * DebugText);
+bool emberAfOperationalCredentialsClusterNOCResponseCallback(chip::app::Command * commandObj, uint8_t StatusCode,
+                                                             uint8_t FabricIndex, chip::ByteSpan DebugText);
 
 /**
  * @brief  Cluster UpdateFabricLabel Command callback

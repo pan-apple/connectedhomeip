@@ -1671,7 +1671,7 @@ void DispatchServerCommand(app::Command * apCommandObj, CommandId aCommandId, En
     {
         switch (aCommandId)
         {
-        case Clusters::OperationalCredentials::Commands::Ids::AddOpCert: {
+        case Clusters::OperationalCredentials::Commands::Ids::AddNOC: {
             expectArgumentCount = 4;
             chip::ByteSpan NOCArray;
             chip::ByteSpan IPKValue;
@@ -1744,8 +1744,8 @@ void DispatchServerCommand(app::Command * apCommandObj, CommandId aCommandId, En
             if (CHIP_NO_ERROR == TLVError && CHIP_NO_ERROR == TLVUnpackError && 4 == validArgumentCount)
             {
                 // TODO(#5098) We should pass the Command Object and EndpointId to the cluster callbacks.
-                wasHandled = emberAfOperationalCredentialsClusterAddOpCertCallback(apCommandObj, NOCArray, IPKValue, CaseAdminNode,
-                                                                                   AdminVendorId);
+                wasHandled = emberAfOperationalCredentialsClusterAddNOCCallback(apCommandObj, NOCArray, IPKValue, CaseAdminNode,
+                                                                                AdminVendorId);
             }
             break;
         }
