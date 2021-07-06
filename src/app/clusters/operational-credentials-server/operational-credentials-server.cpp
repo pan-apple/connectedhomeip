@@ -26,6 +26,7 @@
 #include <app/common/gen/attribute-type.h>
 #include <app/common/gen/cluster-id.h>
 #include <app/common/gen/command-id.h>
+#include <app/common/gen/enums.h>
 #include <app/server/Mdns.h>
 #include <app/server/Server.h>
 #include <app/util/af.h>
@@ -319,6 +320,28 @@ void DoRemoveAllFabrics(intptr_t)
 {
     OpenDefaultPairingWindow(ResetAdmins::kYes);
 }
+
+CHIP_ERROR SendNOCResponse(chip::app::Command * commandObj, EmberAfNOCResponseStatus status, uint8_t index, ByteSpan debug_text)
+{
+    app::CommandPathParams cmdParams = { emberAfCurrentEndpoint(), /* group id */ 0, ZCL_OPERATIONAL_CREDENTIALS_CLUSTER_ID,
+                                         ZCL_NOC_RESPONSE_COMMAND_ID, (chip::app::CommandPathFlags::kEndpointIdValid) };
+    TLV::TLVWriter * writer          = nullptr;
+
+    VerifyOrReturnError(commandObj != nullptr, CHIP_ERROR_INCORRECT_STATE);
+
+    ReturnErrorOnFailure(commandObj->PrepareCommand(cmdParams));
+    writer = commandObj->GetCommandDataElementTLVWriter();
+    ReturnErrorOnFailure(writer->Put(TLV::ContextTag(0), status));
+    if (status == EMBER_ZCL_NOC_RESPONSE_STATUS_SUCCESS)
+    {
+        ReturnErrorOnFailure(writer->Put(TLV::ContextTag(1), index));
+    }
+    ReturnErrorOnFailure(writer->Put(TLV::ContextTag(2), debug_text));
+    ReturnErrorOnFailure(commandObj->FinishCommand());
+
+    return CHIP_NO_ERROR;
+}
+
 } // namespace
 
 // Up for discussion in Multi-Admin TT: chip-spec:#2891
@@ -330,9 +353,8 @@ bool emberAfOperationalCredentialsClusterRemoveAllFabricsCallback(chip::app::Com
     return true;
 }
 
-bool emberAfOperationalCredentialsClusterAddOpCertCallback(chip::app::Command * commandObj, chip::ByteSpan NOCArray,
-                                                           chip::ByteSpan IPKValue, chip::NodeId CaseAdminNode,
-                                                           uint16_t AdminVendorId)
+bool emberAfOperationalCredentialsClusterAddNOCCallback(chip::app::Command * commandObj, chip::ByteSpan NOCArray,
+                                                        chip::ByteSpan IPKValue, chip::NodeId CaseAdminNode, uint16_t AdminVendorId)
 {
     EmberAfStatus status = EMBER_ZCL_STATUS_SUCCESS;
 
@@ -344,6 +366,10 @@ bool emberAfOperationalCredentialsClusterAddOpCertCallback(chip::app::Command * 
     VerifyOrExit(admin->SetOperationalCertsFromCertArray(NOCArray) == CHIP_NO_ERROR, status = EMBER_ZCL_STATUS_FAILURE);
     VerifyOrExit(GetGlobalAdminPairingTable().Store(admin->GetAdminId()) == CHIP_NO_ERROR, status = EMBER_ZCL_STATUS_FAILURE);
 
+    {
+        SendNOCResponse(commandObj, EMBER_ZCL_NOC_RESPONSE_STATUS_SUCCESS, 0, ByteSpan());
+    }
+
     // We have a new operational identity and should start advertising it.  We
     // can't just wait until we get network configuration commands, because we
     // might be on the operational network already, in which case we are
@@ -351,10 +377,10 @@ bool emberAfOperationalCredentialsClusterAddOpCertCallback(chip::app::Command * 
     chip::app::Mdns::AdvertiseOperational();
 
 exit:
-    emberAfSendImmediateDefaultResponse(status);
     if (status == EMBER_ZCL_STATUS_FAILURE)
     {
-        emberAfPrintln(EMBER_AF_PRINT_DEBUG, "OpCreds: Failed AddOpCert request.");
+        emberAfPrintln(EMBER_AF_PRINT_DEBUG, "OpCreds: Failed AddNOC request.");
+        emberAfSendImmediateDefaultResponse(status);
     }
 
     return true;
