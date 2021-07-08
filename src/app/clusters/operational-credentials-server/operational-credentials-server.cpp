@@ -342,6 +342,37 @@ CHIP_ERROR SendNOCResponse(chip::app::Command * commandObj, EmberAfNOCResponseSt
     return CHIP_NO_ERROR;
 }
 
+EmberAfNOCResponseStatus ConvertToNOCResponseStatus(CHIP_ERROR err)
+{
+    switch (err)
+    {
+    case CHIP_NO_ERROR:
+        return EMBER_ZCL_NOC_RESPONSE_STATUS_SUCCESS;
+    case CHIP_ERROR_INVALID_PUBLIC_KEY:
+        return EMBER_ZCL_NOC_RESPONSE_STATUS_INVALID_PUBLIC_KEY;
+    case CHIP_ERROR_WRONG_NODE_ID:
+        return EMBER_ZCL_NOC_RESPONSE_STATUS_INVALID_NODE_OP_ID;
+    case CHIP_ERROR_CA_CERT_NOT_FOUND:
+    case CHIP_ERROR_CERT_PATH_LEN_CONSTRAINT_EXCEEDED:
+    case CHIP_ERROR_CERT_PATH_TOO_LONG:
+    case CHIP_ERROR_CERT_USAGE_NOT_ALLOWED:
+    case CHIP_ERROR_CERT_EXPIRED:
+    case CHIP_ERROR_CERT_NOT_VALID_YET:
+    case CHIP_ERROR_UNSUPPORTED_CERT_FORMAT:
+    case CHIP_ERROR_UNSUPPORTED_ELLIPTIC_CURVE:
+    case CHIP_ERROR_CERT_LOAD_FAILED:
+    case CHIP_ERROR_CERT_NOT_TRUSTED:
+    case CHIP_ERROR_WRONG_CERT_SUBJECT:
+        return EMBER_ZCL_NOC_RESPONSE_STATUS_INVALID_NOC;
+    case CHIP_ERROR_NO_MEMORY:
+        return EMBER_ZCL_NOC_RESPONSE_STATUS_TABLE_FULL;
+    case CHIP_ERROR_INVALID_FABRIC_ID:
+        return EMBER_ZCL_NOC_RESPONSE_STATUS_INVALID_FABRIC_INDEX;
+    };
+
+    return EMBER_ZCL_NOC_RESPONSE_STATUS_INVALID_NOC;
+}
+
 } // namespace
 
 // Up for discussion in Multi-Admin TT: chip-spec:#2891
@@ -356,19 +387,27 @@ bool emberAfOperationalCredentialsClusterRemoveAllFabricsCallback(chip::app::Com
 bool emberAfOperationalCredentialsClusterAddNOCCallback(chip::app::Command * commandObj, chip::ByteSpan NOCArray,
                                                         chip::ByteSpan IPKValue, chip::NodeId CaseAdminNode, uint16_t AdminVendorId)
 {
-    EmberAfStatus status = EMBER_ZCL_STATUS_SUCCESS;
+    CHIP_ERROR err                       = CHIP_NO_ERROR;
+    EmberAfNOCResponseStatus nocResponse = EMBER_ZCL_NOC_RESPONSE_STATUS_SUCCESS;
+    uint8_t fabricIndex                  = 0;
+    AdminPairingInfo * admin             = nullptr;
 
     emberAfPrintln(EMBER_AF_PRINT_DEBUG, "OpCreds: commissioner has added an Op Cert");
 
-    AdminPairingInfo * admin = retrieveCurrentAdmin();
-    VerifyOrExit(admin != nullptr, status = EMBER_ZCL_STATUS_FAILURE);
+    VerifyOrExit(CaseAdminNode != chip::kUndefinedNodeId && CaseAdminNode != chip::kAnyNodeId,
+                 nocResponse = EMBER_ZCL_NOC_RESPONSE_STATUS_MISSING_ACL);
 
-    VerifyOrExit(admin->SetOperationalCertsFromCertArray(NOCArray) == CHIP_NO_ERROR, status = EMBER_ZCL_STATUS_FAILURE);
-    VerifyOrExit(GetGlobalAdminPairingTable().Store(admin->GetAdminId()) == CHIP_NO_ERROR, status = EMBER_ZCL_STATUS_FAILURE);
+    // TODO - enable IPK check and usage in operational credentials cluster
+    // VerifyOrExit(!IPKValue.empty() && IPKValue.data() != nullptr, nocResponse = EMBER_ZCL_NOC_RESPONSE_STATUS_MISSING_IPK);
 
-    {
-        SendNOCResponse(commandObj, EMBER_ZCL_NOC_RESPONSE_STATUS_SUCCESS, 0, ByteSpan());
-    }
+    admin = retrieveCurrentAdmin();
+    VerifyOrExit(admin != nullptr, nocResponse = EMBER_ZCL_NOC_RESPONSE_STATUS_MISSING_CSR);
+
+    err = admin->SetOperationalCertsFromCertArray(NOCArray);
+    VerifyOrExit(err == CHIP_NO_ERROR, nocResponse = ConvertToNOCResponseStatus(err));
+
+    err = GetGlobalAdminPairingTable().Store(admin->GetAdminId());
+    VerifyOrExit(err == CHIP_NO_ERROR, nocResponse = ConvertToNOCResponseStatus(err));
 
     // We have a new operational identity and should start advertising it.  We
     // can't just wait until we get network configuration commands, because we
@@ -376,11 +415,15 @@ bool emberAfOperationalCredentialsClusterAddNOCCallback(chip::app::Command * com
     // expected to be live with our new identity at this point.
     chip::app::Mdns::AdvertiseOperational();
 
+    fabricIndex = GetGlobalAdminPairingTable().GetFabricIndex(admin);
+
 exit:
-    if (status == EMBER_ZCL_STATUS_FAILURE)
+
+    SendNOCResponse(commandObj, nocResponse, fabricIndex, ByteSpan());
+
+    if (nocResponse != EMBER_ZCL_NOC_RESPONSE_STATUS_SUCCESS)
     {
-        emberAfPrintln(EMBER_AF_PRINT_DEBUG, "OpCreds: Failed AddNOC request.");
-        emberAfSendImmediateDefaultResponse(status);
+        emberAfPrintln(EMBER_AF_PRINT_DEBUG, "OpCreds: Failed AddNOC request. Status %d", nocResponse);
     }
 
     return true;

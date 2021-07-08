@@ -343,6 +343,17 @@ public:
     ConstAdminIterator begin() const { return cbegin(); }
     ConstAdminIterator end() const { return cend(); }
 
+    uint8_t GetFabricIndex(AdminPairingInfo * fabric) const
+    {
+        std::ptrdiff_t diff = reinterpret_cast<const uint8_t *>(fabric) - reinterpret_cast<const uint8_t *>(&mStates[0]);
+        assert(diff >= 0);
+        assert(static_cast<size_t>(diff) % sizeof(AdminPairingInfo) == 0);
+        auto index = static_cast<size_t>(diff) / sizeof(AdminPairingInfo);
+        assert(index < CHIP_CONFIG_MAX_DEVICE_ADMINS);
+        assert(index < UINT8_MAX);
+        return static_cast<uint8_t>(index);
+    }
+
 private:
     AdminPairingInfo mStates[CHIP_CONFIG_MAX_DEVICE_ADMINS];
     PersistentStorageDelegate * mStorage = nullptr;
